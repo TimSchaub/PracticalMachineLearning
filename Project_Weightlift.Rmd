@@ -1,0 +1,164 @@
+---
+title: "Weight lifting"
+author: "Tim Schaub"
+date: "1 Januar 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Summary
+
+Below analysis tries to predict the manner in which the users executed an exercise based on training measurements. The data used was taken from http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har with friendly permission.
+
+The analysis states a prediction accuracy of 99.3% leaving an out-of-sample error of 0.7% achieved with a random forrest trained model using k-fold cross validation with k=6 instead of bootstrapping.
+
+## Getting Data
+
+The below code loads the actual data and prints the dimensions of the training data frame:
+
+
+```{r getData}
+urlTraining <- c("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+urlTesting <- c("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+setTraining = read.csv(urlTraining, header=TRUE, sep=",", na.strings="")
+setTesting = read.csv(urlTesting, header=TRUE, sep=",", na.strings="NA")
+dim(setTraining)
+```
+
+## Preprocess Data
+
+
+Since the training set has a lot of variables that are most probably not relevant, we check for variables with a variance near zero that might not be to relevant.
+
+```{r lowVariance}
+
+library(caret)
+
+set.seed(4321)
+
+lowVarianceVars <- nearZeroVar(setTraining)
+setTraining <- setTraining[,-lowVarianceVars]
+setTesting <- setTesting[,-lowVarianceVars]
+dim(setTraining)
+```
+
+
+Next step: eliminate variables with a low grade of given values. If they would show to be relevant we could add them again and use imputing to fill gaps. Assumed threshold: 66% of values should be filled.
+
+```{r lowFillGrade}
+
+NAOnly <- sapply(1:dim(setTraining)[2], function(x) (sum(!is.na(setTraining[,x]))) >= 0.66 * nrow(setTraining))
+NAindexes <- which(NAOnly == FALSE)
+setTraining <- setTraining[,-NAindexes]
+setTesting <- setTesting[,-NAindexes]
+dim(setTraining)
+```
+
+Next step: eliminate variables that are not used for our purposes (first six variables in the dataset contain only additional information like user, sequence, timestamp)
+
+```{r unused}
+
+unused <- 1:6
+setTraining <- setTraining[,-unused]
+setTesting <- setTesting[,-unused]
+dim(setTraining)
+```
+
+## Model fitting
+
+Firstly we split the data into training and additional validation data to measure an out-of-sample error later.
+
+```{r partition}
+
+inTrain <- createDataPartition(setTraining$classe, p=0.6, list=FALSE)
+setValidation <- setTraining[-inTrain,]
+setTraining <- setTraining[inTrain,]
+dim(setTraining)
+```
+
+
+As a second step, the actual model is fit. We choose random forrest as prediction model for accuracy reasons.
+To be able to process this training in a timely manner we use more than one core using the doParallel package.
+
+
+```{r parallelOn}
+
+#use parallel processing for performance reasons
+library(doParallel)
+cluster <- makeCluster(detectCores()-1 )  #leave one core to OS
+registerDoParallel(cluster)
+```
+
+To be able to train the model, the regular bootstrapping is replaced by a k-fold cross validation, using k=6
+
+
+```{r trainModel}
+
+#change control to use in cross validation to k-fold, use 6 folds for performance reasons
+modelControl <- trainControl(method="cv", number=6, allowParallel = TRUE)
+#train model
+modelTree <- train(classe ~ ., data=setTraining, method="rf", trControl=modelControl)
+
+#unregister parallel
+stopCluster(cluster)
+registerDoSEQ()
+```
+
+
+## Validation of the model
+
+We use the confusionMatrix to show the actual accuracy and error.
+
+```{r validation}
+
+#validation
+validation <- predict(modelTree, newdata=setValidation)
+confusionMatrix(validation, setValidation$classe)
+```
+
+Given the accuray and error values, we do not need to add omitted values and receive an out of sample error of 0.7% against the validation data.
+
+
+Variable importance descending:
+```{r varImp}
+
+#variable importance
+varImp(modelTree)
+
+```
+
+
+## Prediction
+
+The last step is the actual prediction with the fitted model on the 20 test cases. 
+
+```{r prediction}
+
+prediction <- predict(modelTree, newdata=setTesting)
+
+prediction
+
+
+```
+
+
+Write to files for submission:
+
+```{r submit}
+  writeFiles = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+      filename = paste0("problem_id_", i, ".txt")
+      write.table(x[i], file = filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+    }
+    
+  }
+  
+  writeFiles(prediction)
+```
+
+
+
