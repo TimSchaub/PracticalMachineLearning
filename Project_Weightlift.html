@@ -130,8 +130,7 @@ $(document).ready(function () {
 </div>
 <div id="getting-data" class="section level2">
 <h2>Getting Data</h2>
-<p>This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <a href="http://rmarkdown.rstudio.com" class="uri">http://rmarkdown.rstudio.com</a>.</p>
-<p>When you click the <strong>Knit</strong> button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:</p>
+<p>The below code loads the actual data and prints the dimensions of the training data frame:</p>
 <pre class="r"><code>urlTraining &lt;- c(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv&quot;)
 urlTesting &lt;- c(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;)
 setTraining = read.csv(urlTraining, header=TRUE, sep=&quot;,&quot;, na.strings=&quot;&quot;)
@@ -174,7 +173,7 @@ setValidation &lt;- setTraining[-inTrain,]
 setTraining &lt;- setTraining[inTrain,]
 dim(setTraining)</code></pre>
 <pre><code>## [1] 11776    53</code></pre>
-<p>As a second step, the actual model is fit. We choose random forrest as prediction model for performance and accuracy reasons. To be able to process this training in a timely manner we use more than one core using the doParallel package.</p>
+<p>As a second step, the actual model is fit. We choose random forrest as prediction model for accuracy reasons. To be able to process this training in a timely manner we use more than one core using the doParallel package.</p>
 <pre class="r"><code>#use parallel processing for performance reasons
 library(doParallel)</code></pre>
 <pre><code>## Loading required package: foreach</code></pre>
@@ -268,11 +267,11 @@ prediction</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>
 <p>Write to files for submission:</p>
-<pre class="submit"><code>  writeFiles = function(x) {
+<pre class="r"><code>  writeFiles = function(x) {
     n = length(x)
     for (i in 1:n) {
       filename = paste0(&quot;problem_id_&quot;, i, &quot;.txt&quot;)
-      write.table(x[i], file = filename, quote=FALSE, row.names=FALSE, colNames=FALSE)
+      write.table(x[i], file = filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
     }
     
   }
